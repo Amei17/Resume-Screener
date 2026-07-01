@@ -50,6 +50,9 @@ export default function ResultsTable({ results }: ResultsTableProps) {
       const order = { "Strong Hire": 4, "Hire": 3, "Maybe": 2, "Reject": 1 };
       aValue = order[a.recommendation];
       bValue = order[b.recommendation];
+    } else if (sortColumn === "flags") {
+      aValue = a.inconsistencies?.length ?? 0;
+      bValue = b.inconsistencies?.length ?? 0;
     } else {
       aValue = a[sortColumn as keyof ScreeningResult];
       bValue = b[sortColumn as keyof ScreeningResult];
@@ -96,6 +99,20 @@ export default function ResultsTable({ results }: ResultsTableProps) {
     if (score >= 60) return "text-blue-600 dark:text-blue-400";
     if (score >= 40) return "text-yellow-600 dark:text-yellow-400";
     return "text-red-600 dark:text-red-400";
+  };
+
+  const getFlagsDisplay = (inconsistencies: string[] | null | undefined) => {
+    const count = inconsistencies?.length ?? 0;
+    if (count === 0) {
+      return { text: "No Flags", color: "text-green-600 dark:text-green-400", icon: <CheckCircle className="w-4 h-4" /> };
+    }
+    if (count === 1) {
+      return { text: "1 Flag", color: "text-yellow-600 dark:text-yellow-400", icon: <AlertCircle className="w-4 h-4" /> };
+    }
+    if (count === 2) {
+      return { text: "2 Flags", color: "text-yellow-600 dark:text-yellow-400", icon: <AlertCircle className="w-4 h-4" /> };
+    }
+    return { text: "3+ Flags", color: "text-red-600 dark:text-red-400", icon: <AlertCircle className="w-4 h-4" /> };
   };
 
   return (
@@ -145,6 +162,20 @@ export default function ResultsTable({ results }: ResultsTableProps) {
                   ))}
               </div>
             </th>
+            <th
+              className="px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700"
+              onClick={() => handleSort("flags")}
+            >
+              <div className="flex items-center gap-2">
+                Flags
+                {sortColumn === "flags" &&
+                  (sortDirection === "asc" ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  ))}
+              </div>
+            </th>
             <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-300">
               Actions
             </th>
@@ -180,6 +211,12 @@ export default function ResultsTable({ results }: ResultsTableProps) {
                   </span>
                 </td>
                 <td className="px-4 py-3">
+                  <span className={`inline-flex items-center gap-1 ${getFlagsDisplay(result.inconsistencies).color}`}>
+                    {getFlagsDisplay(result.inconsistencies).icon}
+                    {getFlagsDisplay(result.inconsistencies).text}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
                   <button
                     onClick={() =>
                       setExpandedRow(expandedRow === result.id ? null : result.id)
@@ -192,107 +229,121 @@ export default function ResultsTable({ results }: ResultsTableProps) {
               </tr>
               {expandedRow === result.id && (
                 <tr className="bg-slate-50 dark:bg-slate-800/50">
-                  <td colSpan={4} className="px-4 py-6">
+                  <td colSpan={5} className="px-4 py-6">
                     <div className="space-y-6">
                       {/* Score Breakdown */}
-                      <div>
-                        <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
-                          Score Breakdown
-                        </h4>
-                        <div className="space-y-2">
-                          {result.scoreReasons.map((reason, idx) => (
-                            <div
-                              key={idx}
-                              className="flex items-center justify-between p-3 bg-white dark:bg-slate-700 rounded-lg"
-                            >
-                              <div>
-                                <div className="font-medium text-slate-900 dark:text-white">
-                                  {reason.category}
+                      {result.scoreReasons && result.scoreReasons.length > 0 && (
+                        <div>
+                          <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
+                            Score Breakdown
+                          </h4>
+                          <div className="space-y-2">
+                            {result.scoreReasons.map((reason, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center justify-between p-3 bg-white dark:bg-slate-700 rounded-lg"
+                              >
+                                <div>
+                                  <div className="font-medium text-slate-900 dark:text-white">
+                                    {reason.category}
+                                  </div>
+                                  <div className="text-sm text-slate-600 dark:text-slate-400">
+                                    {reason.reason}
+                                  </div>
                                 </div>
-                                <div className="text-sm text-slate-600 dark:text-slate-400">
-                                  {reason.reason}
+                                <div className={`text-lg font-bold ${getScoreColor(reason.score)}`}>
+                                  {reason.score}%
                                 </div>
                               </div>
-                              <div className={`text-lg font-bold ${getScoreColor(reason.score)}`}>
-                                {reason.score}%
-                              </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {/* Skills */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
-                            Matched Skills
-                          </h4>
-                          <div className="flex flex-wrap gap-2">
-                            {result.skillsMatched.map((skill, idx) => (
-                              <span
-                                key={idx}
-                                className="px-3 py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-full text-sm"
-                              >
-                                {skill}
-                              </span>
-                            ))}
-                          </div>
+                      {(result.skillsMatched && result.skillsMatched.length > 0 || result.missingSkills && result.missingSkills.length > 0) && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {result.skillsMatched && result.skillsMatched.length > 0 && (
+                            <div>
+                              <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
+                                Matched Skills
+                              </h4>
+                              <div className="flex flex-wrap gap-2">
+                                {result.skillsMatched.map((skill, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="px-3 py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-full text-sm"
+                                  >
+                                    {skill}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {result.missingSkills && result.missingSkills.length > 0 && (
+                            <div>
+                              <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
+                                Missing Skills
+                              </h4>
+                              <div className="flex flex-wrap gap-2">
+                                {result.missingSkills.map((skill, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="px-3 py-1 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded-full text-sm"
+                                  >
+                                    {skill}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <div>
-                          <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
-                            Missing Skills
-                          </h4>
-                          <div className="flex flex-wrap gap-2">
-                            {result.missingSkills.map((skill, idx) => (
-                              <span
-                                key={idx}
-                                className="px-3 py-1 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded-full text-sm"
-                              >
-                                {skill}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
+                      )}
 
                       {/* Strengths and Weaknesses */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
-                            Strengths
-                          </h4>
-                          <ul className="space-y-2">
-                            {result.strengths.map((strength, idx) => (
-                              <li
-                                key={idx}
-                                className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300"
-                              >
-                                <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                                {strength}
-                              </li>
-                            ))}
-                          </ul>
+                      {(result.strengths && result.strengths.length > 0 || result.weaknesses && result.weaknesses.length > 0) && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {result.strengths && result.strengths.length > 0 && (
+                            <div>
+                              <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
+                                Strengths
+                              </h4>
+                              <ul className="space-y-2">
+                                {result.strengths.map((strength, idx) => (
+                                  <li
+                                    key={idx}
+                                    className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300"
+                                  >
+                                    <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                                    {strength}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {result.weaknesses && result.weaknesses.length > 0 && (
+                            <div>
+                              <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
+                                Weaknesses
+                              </h4>
+                              <ul className="space-y-2">
+                                {result.weaknesses.map((weakness, idx) => (
+                                  <li
+                                    key={idx}
+                                    className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300"
+                                  >
+                                    <XCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                                    {weakness}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
                         </div>
-                        <div>
-                          <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
-                            Weaknesses
-                          </h4>
-                          <ul className="space-y-2">
-                            {result.weaknesses.map((weakness, idx) => (
-                              <li
-                                key={idx}
-                                className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300"
-                              >
-                                <XCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-                                {weakness}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
+                      )}
 
                       {/* Inconsistencies */}
-                      {result.inconsistencies.length > 0 && (
+                      {result.inconsistencies && result.inconsistencies.length > 0 && (
                         <div>
                           <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
                             Employment/Education Inconsistencies

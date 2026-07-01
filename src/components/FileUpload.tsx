@@ -95,26 +95,52 @@ export default function FileUpload({
       </div>
 
       {files.length > 0 && (
-        <div className="mt-4 space-y-2">
-          {files.map((file, index) => (
-            <div
-              key={index}
-              className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700 rounded-lg"
-            >
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-slate-500" />
-                <span className="text-sm text-slate-700 dark:text-slate-300">
-                  {file.name}
-                </span>
+        <div className="mt-4">
+          {multiple ? (
+            <div className="max-h-64 overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {files.map((file, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors group"
+                  >
+                    <FileText className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                    <span className="text-sm text-slate-700 dark:text-slate-300 truncate flex-1 min-w-0" title={file.name}>
+                      {file.name}
+                    </span>
+                    <button
+                      onClick={() => removeFile(index)}
+                      className="text-slate-500 hover:text-red-500 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
               </div>
-              <button
-                onClick={() => removeFile(index)}
-                className="text-slate-500 hover:text-red-500 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
             </div>
-          ))}
+          ) : (
+            <div className="space-y-2">
+              {files.map((file, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700 rounded-lg"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-slate-500" />
+                    <span className="text-sm text-slate-700 dark:text-slate-300">
+                      {file.name}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => removeFile(index)}
+                    className="text-slate-500 hover:text-red-500 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -11,12 +11,14 @@ export default function Home() {
   const [results, setResults] = useState<any[]>([]);
   const [isScreening, setIsScreening] = useState(false);
 
-  const handleJobDescriptionUpload = (file: File) => {
+  const handleJobDescriptionUpload = (files: File | File[]) => {
+    const file = Array.isArray(files) ? files[0] : files;
     setJobDescription(file);
   };
 
-  const handleResumesUpload = (files: File[]) => {
-    setResumes(files);
+  const handleResumesUpload = (files: File | File[]) => {
+    const filesArray = Array.isArray(files) ? files : [files];
+    setResumes(filesArray);
   };
 
   const handleScreen = async () => {

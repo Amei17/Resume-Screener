@@ -240,7 +240,7 @@ export async function POST(request: NextRequest) {
         if (cachedResult) {
           console.log("Cache hit - returning existing screening result");
           results.push({
-            id: cachedResult.id,
+            id: `${cachedResult.id}-${resumeFile.name}`,
             candidateName: cachedResult.resume?.candidate?.name ?? "Unknown",
             resumeFileName: resumeFile.name,
             overallMatchScore: cachedResult.overallMatchScore,

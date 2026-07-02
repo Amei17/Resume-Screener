@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 
+console.log(
+  "Key prefix:",
+  process.env.GEMINI_API_KEY?.substring(0, 10)
+);
+
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY!,
 });

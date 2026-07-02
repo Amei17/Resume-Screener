@@ -10,6 +10,7 @@ export default function Home() {
   const [resumes, setResumes] = useState<File[]>([]);
   const [results, setResults] = useState<any[]>([]);
   const [isScreening, setIsScreening] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleJobDescriptionUpload = (files: File | File[]) => {
     const file = Array.isArray(files) ? files[0] : files;
@@ -28,6 +29,7 @@ export default function Home() {
     }
 
     setIsScreening(true);
+    setErrorMessage(null);
     try {
       const formData = new FormData();
       formData.append("jobDescription", jobDescription!);
@@ -41,14 +43,20 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        throw new Error("Screening failed");
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || "Failed to screen resumes. Please try again.");
       }
 
       const data = await response.json();
       setResults(data.results);
     } catch (error) {
       console.error("Error screening resumes:", error);
-      alert("Failed to screen resumes. Please try again.");
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to screen resumes. Please try again.";
+      setErrorMessage(message);
+      alert(message);
     } finally {
       setIsScreening(false);
     }
@@ -90,6 +98,15 @@ export default function Home() {
             >
               {isScreening ? "Screening..." : "Screen Resumes"}
             </Button>
+          </div>
+        )}
+
+        {errorMessage && (
+          <div
+            role="alert"
+            className="mb-8 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+          >
+            {errorMessage}
           </div>
         )}
 

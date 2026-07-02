@@ -1,17 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
 import { GoogleGenAI } from "@google/genai";
-import { createHash } from "crypto";
-
-const prisma = new PrismaClient();
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY!,
 });
 
-function generateInputHash(jobDescriptionText: string, resumeText: string): string {
-  const input = jobDescriptionText + "||" + resumeText;
-  return createHash("sha256").update(input).digest("hex");
+const GEMINI_QUOTA_ERROR_MESSAGE =
+  "Gemini API quota exceeded. Please try again later or use a different API key.";
+
+class GeminiQuotaError extends Error {
+  constructor() {
+    super(GEMINI_QUOTA_ERROR_MESSAGE);
+    this.name = "GeminiQuotaError";
+  }
+}
+
+function isGeminiQuotaError(error: unknown): boolean {
+  const maybeError = error as {
+    status?: number;
+    code?: number | string;
+    message?: string;
+  };
+
+  const status = Number(maybeError?.status ?? maybeError?.code);
+  const message = String(maybeError?.message ?? error ?? "").toLowerCase();
+
+  return (
+    status === 429 ||
+    message.includes("quota") ||
+    message.includes("rate limit") ||
+    message.includes("rate_limit") ||
+    message.includes("too many requests") ||
+    message.includes("resource_exhausted")
+  );
 }
 
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
@@ -168,6 +189,9 @@ Return ONLY valid JSON.
 
   } catch (error) {
     console.error("Gemini Error:", error);
+    if (isGeminiQuotaError(error)) {
+      throw new GeminiQuotaError();
+    }
     throw new Error("Failed to analyze resume");
   }
 }
@@ -205,7 +229,7 @@ export async function POST(request: NextRequest) {
 
     const results = [];
 
-    for (const resumeFile of resumeFiles) {
+    for (const [index, resumeFile] of resumeFiles.entries()) {
 
       try {
 
@@ -216,143 +240,16 @@ export async function POST(request: NextRequest) {
         const resumeText =
           await extractTextFromPDF(resumeBuffer);
 
-        const inputHash = generateInputHash(jobDescriptionText, resumeText);
-
-        let screeningResult;
-        let cachedResult = null;
-
-        try {
-          cachedResult = await prisma.screeningResult.findUnique({
-            where: { inputHash },
-            include: {
-              screeningReasons: true,
-              resume: {
-                include: {
-                  candidate: true,
-                },
-              },
-            },
-          });
-        } catch (error) {
-          console.error("Cache lookup failed:", error);
-        }
-
-        if (cachedResult) {
-          console.log("Cache hit - returning existing screening result");
-          results.push({
-            id: `${cachedResult.id}-${resumeFile.name}`,
-            candidateName: cachedResult.resume?.candidate?.name ?? "Unknown",
-            resumeFileName: resumeFile.name,
-            overallMatchScore: cachedResult.overallMatchScore,
-            skillsMatched: JSON.parse(cachedResult.skillsMatched),
-            missingSkills: JSON.parse(cachedResult.missingSkills),
-            strengths: JSON.parse(cachedResult.strengths),
-            weaknesses: JSON.parse(cachedResult.weaknesses),
-            inconsistencies: JSON.parse(cachedResult.inconsistencies),
-            recommendation: cachedResult.recommendation,
-            scoreReasons: cachedResult.screeningReasons.map((reason: any) => ({
-              category: reason.category,
-              score: reason.score,
-              reason: reason.reason,
-            })),
-          });
-          continue;
-        }
-
-        screeningResult =
+        const screeningResult =
           await screenResumeWithGemini(
             resumeText,
             jobDescriptionText
           );
-                  const candidate =
-          await prisma.candidate.create({
-            data: {
-              name:
-                screeningResult.candidateName ??
-                "Unknown",
-            },
-          });
-
-        const resume =
-          await prisma.resume.create({
-            data: {
-              fileName: resumeFile.name,
-              fileData:
-                resumeBuffer.toString("base64"),
-              extractedText: resumeText,
-              candidateId: candidate.id,
-            },
-          });
-
-        for (const skill of screeningResult.skillsMatched ?? []) {
-
-          await prisma.skill.create({
-            data: {
-              name: skill,
-              matched: true,
-              resumeId: resume.id,
-            },
-          });
-
-        }
-
-        for (const skill of screeningResult.missingSkills ?? []) {
-
-          await prisma.skill.create({
-            data: {
-              name: skill,
-              matched: false,
-              resumeId: resume.id,
-            },
-          });
-
-        }
-
-        const screeningResultDb =
-          await prisma.screeningResult.create({
-            data: {
-              inputHash,
-              overallMatchScore:
-                screeningResult.overallMatchScore,
-              recommendation:
-                screeningResult.recommendation,
-              strengths: JSON.stringify(
-                screeningResult.strengths ?? []
-              ),
-              weaknesses: JSON.stringify(
-                screeningResult.weaknesses ?? []
-              ),
-              inconsistencies: JSON.stringify(
-                screeningResult.inconsistencies ?? []
-              ),
-              skillsMatched: JSON.stringify(
-                screeningResult.skillsMatched ?? []
-              ),
-              missingSkills: JSON.stringify(
-                screeningResult.missingSkills ?? []
-              ),
-              resumeId: resume.id,
-            },
-          });
-
-        for (const reason of screeningResult.scoreReasons ?? []) {
-
-          await prisma.screeningReason.create({
-            data: {
-              category: reason.category,
-              score: reason.score,
-              reason: reason.reason,
-              resultId:
-                screeningResultDb.id,
-            },
-          });
-
-        }
 
         results.push({
-          id: screeningResultDb.id,
+          id: `${resumeFile.name}-${index}`,
           candidateName:
-            screeningResult.candidateName,
+            screeningResult.candidateName ?? "Unknown",
           resumeFileName:
             resumeFile.name,
           overallMatchScore:
@@ -375,6 +272,17 @@ export async function POST(request: NextRequest) {
 
       } catch (error) {
 
+        if (error instanceof GeminiQuotaError) {
+          return NextResponse.json(
+            {
+              error: GEMINI_QUOTA_ERROR_MESSAGE,
+            },
+            {
+              status: 429,
+            }
+          );
+        }
+
         console.error(
           `Error processing ${resumeFile.name}`,
           error
@@ -391,6 +299,17 @@ export async function POST(request: NextRequest) {
   } catch (error) {
 
     console.error(error);
+
+    if (error instanceof GeminiQuotaError) {
+      return NextResponse.json(
+        {
+          error: GEMINI_QUOTA_ERROR_MESSAGE,
+        },
+        {
+          status: 429,
+        }
+      );
+    }
 
     return NextResponse.json(
       {

@@ -1,12 +1,12 @@
 # AI Resume Screener
 
-A production-ready resume screening web application built with Next.js 15, TypeScript, Tailwind CSS, Prisma ORM, SQLite, and OpenAI API.
+A production-ready resume screening web application built with Next.js 15, TypeScript, Tailwind CSS, and Gemini API.
 
 ## Features
 
 - **PDF Upload**: Upload a job description PDF and multiple resume PDFs
 - **Text Extraction**: Automatically extracts text from PDFs using pdf-parse
-- **AI-Powered Screening**: Uses OpenAI GPT-4o to analyze resumes against job descriptions
+- **AI-Powered Screening**: Uses Gemini to analyze resumes against job descriptions
 - **Comprehensive Analysis**: Returns detailed screening results including:
   - Overall Match Score (0-100)
   - Skills Matched vs Missing Skills
@@ -14,37 +14,23 @@ A production-ready resume screening web application built with Next.js 15, TypeS
   - Employment/Education Inconsistencies
   - Recommendation (Strong Hire, Hire, Maybe, Reject)
   - Detailed score breakdowns with transparent reasons
-- **Database Storage**: Stores all data in SQLite using Prisma ORM
 - **Modern UI**: Clean, responsive interface with Tailwind CSS
 - **Sortable Results**: Interactive table with sorting capabilities
-
-## Database Schema
-
-The application uses a comprehensive database schema with the following models:
-
-- **Candidate**: Stores candidate information (name, email, phone)
-- **Resume**: Stores resume files and extracted text
-- **ParsedEntity**: Stores parsed entities from resumes (name, email, education, etc.)
-- **Skill**: Stores extracted skills with match status
-- **ScreeningResult**: Stores overall screening results
-- **ScreeningReason**: Stores detailed reasons for each score category
-- **Flag**: Stores flags for potential issues (employment gaps, education mismatches, etc.)
 
 ## Tech Stack
 
 - **Framework**: Next.js 15 with App Router
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
-- **Database**: SQLite with Prisma ORM
-- **AI**: OpenAI GPT-4o API
-- **PDF Parsing**: pdf-parse
+- **AI**: Gemini API
+- **PDF Parsing**: pdf2json
 - **Icons**: Lucide React
 - **Utilities**: clsx, tailwind-merge
 
 ## Prerequisites
 
 - Node.js 18+ installed
-- OpenAI API key
+- Gemini API key
 
 ## Installation
 
@@ -63,23 +49,17 @@ The application uses a comprehensive database schema with the following models:
    cp .env.example .env
    ```
    
-   Edit `.env` and add your OpenAI API key:
+   Edit `.env` and add your Gemini API key:
    ```
-   OPENAI_API_KEY=your_actual_openai_api_key_here
-   ```
-
-4. **Initialize the database**:
-   ```bash
-   npx prisma generate
-   npx prisma db push
+   GEMINI_API_KEY=your_actual_gemini_api_key_here
    ```
 
-5. **Run the development server**:
+4. **Run the development server**:
    ```bash
    npm run dev
    ```
 
-6. **Open your browser**:
+5. **Open your browser**:
    Navigate to [http://localhost:3000](http://localhost:3000)
 
 ## Usage
@@ -144,18 +124,10 @@ Screens uploaded resumes against a job description.
 - `npm start` - Start production server
 - `npm run lint` - Run ESLint
 
-### Database Management
-
-- `npx prisma studio` - Open Prisma Studio to view database
-- `npx prisma db push` - Push schema changes to database
-- `npx prisma generate` - Generate Prisma Client
-
 ## Project Structure
 
 ```
 resume-screener/
-├── prisma/
-│   └── schema.prisma          # Database schema
 ├── src/
 │   ├── app/
 │   │   ├── api/
@@ -168,7 +140,7 @@ resume-screener/
 │       ├── Button.tsx         # Button component
 │       ├── FileUpload.tsx     # File upload component
 │       └── ResultsTable.tsx   # Results table component
-├── .env.example               # Environment variables example
+├── .env.example               # Gemini environment variable example
 ├── next.config.js             # Next.js configuration
 ├── package.json               # Dependencies
 ├── tailwind.config.ts         # Tailwind configuration
@@ -181,6 +153,6 @@ MIT
 
 ## Notes
 
-- The application stores resume files as base64 encoded strings in SQLite. For production use with many resumes, consider using object storage (S3, etc.) instead.
-- The OpenAI API rate limits may apply when screening many resumes at once.
-- Ensure your OpenAI API key has sufficient credits for the expected usage.
+- Results are generated per request and are not cached in a database.
+- Gemini API rate limits may apply when screening many resumes at once.
+- Ensure your Gemini API key has sufficient credits for the expected usage.
